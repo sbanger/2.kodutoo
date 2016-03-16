@@ -1,6 +1,6 @@
 (function(){
    "use strict";
-
+   var player;
    var Muusikapurk = function(){
 
      // SEE ON SINGLETON PATTERN
@@ -16,48 +16,30 @@
 
      console.log('Muusikapurgi sees');
 
-     // KÃ•IK muuutujad, mida muudetakse ja on rakendusega seotud defineeritakse siin
+     // KÃƒâ€¢IK muuutujad, mida muudetakse ja on rakendusega seotud defineeritakse siin
      this.click_count = 0;
      this.currentRoute = null;
      console.log(this);
 
-     // hakkan hoidma kÃµiki purke
+     // hakkan hoidma kÃƒÂµiki purke
      this.jars = [];
 
      // Kui tahan Moosipurgile referenci siis kasutan THIS = MOOSIPURGI RAKENDUS ISE
      this.init();
-
-
-        // Extract a array
-        $.map(this.jars, function(value, key) {
-            // take the id of youtube link on your array
-            var id = value.link.split("?v="),
-                id = id[1];
-
-            // and displays embed youtube to element #youtube-video
-            $("#player").append($("<iframe />", {
-                src: "https://youtube.com/embed/"+id+"?autoplay=1",
-                frameborder: 0,
-                width: "100%",
-                height: 300
-            }))
-        });
-
-
    };
 
-   window.Muusikapurk = Muusikapurk; // Paneme muuutja kÃ¼lge
+   window.Muusikapurk = Muusikapurk; // Paneme muuutja kÃƒÂ¼lge
 
    Muusikapurk.routes = {
      'home-view': {
        'render': function(){
-         // kÃ¤ivitame siis kui lehte laeme
+         // kÃƒÂ¤ivitame siis kui lehte laeme
          console.log('>>>>avaleht');
        }
      },
      'list-view': {
        'render': function(){
-         // kÃ¤ivitame siis kui lehte laeme
+         // kÃƒÂ¤ivitame siis kui lehte laeme
          console.log('>>>>loend');
 
          //simulatsioon laeb kaua
@@ -69,16 +51,20 @@
      },
      'manage-view': {
        'render': function(){
-         // kÃ¤ivitame siis kui lehte laeme
+         // kÃƒÂ¤ivitame siis kui lehte laeme
        }
      }
    };
 
-   // KÃµik funktsioonid lÃ¤hevad Moosipurgi kÃ¼lge
+   // KÃƒÂµik funktsioonid lÃƒÂ¤hevad Moosipurgi kÃƒÂ¼lge
    Muusikapurk.prototype = {
+		player : null,
+		currentPlaylist: [],
+
 
      init: function(){
-       console.log('Rakendus lÃ¤ks tÃ¶Ã¶le');
+       console.log('Rakendus lÃƒÂ¤ks tÃƒÂ¶ÃƒÂ¶le');
+	   var currentPlaylistTemp = []; //Ajutine array.
 
        //kuulan aadressirea vahetust
        window.addEventListener('hashchange', this.routeChange.bind(this));
@@ -86,39 +72,26 @@
        // kui aadressireal ei ole hashi siis lisan juurde
        if(!window.location.hash){
          window.location.hash = 'home-view';
-         // routechange siin ei ole vaja sest kÃ¤sitsi muutmine kÃ¤ivitab routechange event'i ikka
+         // routechange siin ei ole vaja sest kÃƒÂ¤sitsi muutmine kÃƒÂ¤ivitab routechange event'i ikka
        }else{
-         //esimesel kÃ¤ivitamisel vaatame urli Ã¼le ja uuendame menÃ¼Ã¼d
+         //esimesel kÃƒÂ¤ivitamisel vaatame urli ÃƒÂ¼le ja uuendame menÃƒÂ¼ÃƒÂ¼d
          this.routeChange();
        }
 
-
-       function getLink(jars, link){
-
-       }
-
-       //saan kÃ¤tte purgid localStorage kui on
+       //saan kÃƒÂ¤tte purgid localStorage kui on
        if(localStorage.jars){
-           //vÃµtan stringi ja teen tagasi objektideks
+           //vÃƒÂµtan stringi ja teen tagasi objektideks
            this.jars = JSON.parse(localStorage.jars);
            console.log('laadisin localStorageist massiiivi ' + this.jars.length);
 
-           //saan kätte lingid
-
-
            //tekitan loendi htmli
            this.jars.forEach(function(jar){
-
                var new_jar = new Jar(jar.id, jar.title, jar.link);
-
                var li = new_jar.createHtmlElement();
                document.querySelector('.list-of-jars').appendChild(li);
-
            });
-
        }else{
-
-		   //kÃ¼sin AJAXIGA
+		   //kÃƒÂ¼sin AJAXIGA
 			var xhttp = new XMLHttpRequest();
 			xhttp.onreadystatechange = function() {
 				if (xhttp.readyState == 4 && xhttp.status == 200) {
@@ -130,9 +103,13 @@
 
 					//teen purgid htmli
 					Muusikapurk.instance.jars.forEach(function(jar){
+					   //Lisan youtube playlisti, mis sisestatakse videomÃ¤ngijasse.
+						var id = jar.link.split("?v="),
+							id = id[1];
+							//LÃ¼kkame arraysse video ID
+						currentPlaylistTemp.push(id);
 
 					   var new_jar = new Jar(jar.id, jar.title, jar.link);
-
 					   var li = new_jar.createHtmlElement();
 					   document.querySelector('.list-of-jars').appendChild(li);
 
@@ -149,20 +126,40 @@
 
 
 	   }
-
-
-       // esimene loogika oleks see, et kuulame hiireklikki nupul
+	   //Lisan temp array pÃµhiarraysse
+	   this.updatePlaylist();
+	   //Loome videomÃ¤ngija.
+	   this.startPlayer();
+	    // esimene loogika oleks see, et kuulame hiireklikki nupul
        this.bindEvents();
 
      },
+	 updatePlaylist: function(){
+		var currentPlaylistTemp = []; //AJutine array
+		this.jars.forEach(function(jar){
+			//Lisan youtube playlisti, mis sisestatakse videomÃ¤ngijasse.
+			var id = jar.link.split("?v="),
+				id = id[1];
+				//LÃ¼kkame arraysse video ID
+			currentPlaylistTemp.push(id);
+		 });
 
-
+		//KÃµik videod on lisautud uute playlisti. MÃ¤Ã¤rame selle playlisti ka mÃ¤ngija playlistiks.
+		this.currentPlaylist = currentPlaylistTemp;
+	 },
+	 startPlayer: function(){
+		var that = this;
+		this.player = new YT.Player('player', {
+			  height: '390',
+			  width: '640',
+			  playerVars: { 'autoplay': 1, 'controls': 1, 'playlist': that.currentPlaylist.join(",")},
+		});
+	 },
      bindEvents: function(){
-       document.querySelector('.add-new-jar').addEventListener('click', this.addNewClick.bind(this));
+		document.querySelector('.add-new-jar').addEventListener('click', this.addNewClick.bind(this));
 
-       //kuulan trÃ¼kkimist otsikastis
-       document.querySelector('#search').addEventListener('keyup', this.search.bind(this));
-
+		//kuulan trÃƒÂ¼kkimist otsikastis
+		document.querySelector('#search').addEventListener('keyup', this.search.bind(this));
      },
 	 deleteJar: function(event){
 
@@ -200,7 +197,7 @@
 
 			if(this.jars[i].id == delete_id){
 				//see on see
-				//kustuta kohal i objekt Ã¤ra
+				//kustuta kohal i objekt ÃƒÂ¤ra
 				this.jars.splice(i, 1);
 				break;
 			}
@@ -212,7 +209,7 @@
 
 	 },
      search: function(event){
-         //otsikasti vÃ¤Ã¤rtus
+         //otsikasti vÃƒÂ¤ÃƒÂ¤rtus
          var needle = document.querySelector('#search').value.toLowerCase();
          console.log(needle);
 
@@ -223,10 +220,10 @@
 
              var li = list[i];
 
-             // Ã¼he listitemi sisu tekst
+             // ÃƒÂ¼he listitemi sisu tekst
              var stack = li.querySelector('.content').innerHTML.toLowerCase();
 
-             //kas otsisÃµna on sisus olemas
+             //kas otsisÃƒÂµna on sisus olemas
              if(stack.indexOf(needle) !== -1){
                  //olemas
                  li.style.display = 'list-item';
@@ -262,7 +259,7 @@
 		//AJAX
 		var xhttp = new XMLHttpRequest();
 
-		//mis juhtub kui pÃ¤ring lÃµppeb
+		//mis juhtub kui pÃƒÂ¤ring lÃƒÂµppeb
 		xhttp.onreadystatechange = function() {
 
 			console.log(xhttp.readyState);
@@ -273,7 +270,7 @@
 			}
 		};
 
-		//teeb pÃ¤ringu
+		//teeb pÃƒÂ¤ringu
 		xhttp.open("GET", "save.php?id="+id+"&title="+title+"&link="+link, true);
 		xhttp.send();
 
@@ -287,14 +284,14 @@
 
      routeChange: function(event){
 
-       //kirjutan muuutujasse lehe nime, vÃµtan maha #
+       //kirjutan muuutujasse lehe nime, vÃƒÂµtan maha #
        this.currentRoute = location.hash.slice(1);
        console.log(this.currentRoute);
 
        //kas meil on selline leht olemas?
        if(this.routes[this.currentRoute]){
 
-         //muudan menÃ¼Ã¼ lingi aktiivseks
+         //muudan menÃƒÂ¼ÃƒÂ¼ lingi aktiivseks
          this.updateMenu();
 
          this.routes[this.currentRoute].render();
@@ -309,7 +306,7 @@
 
      updateMenu: function() {
        //http://stackoverflow.com/questions/195951/change-an-elements-class-with-javascript
-       //1) vÃµtan maha aktiivse menÃ¼Ã¼lingi kui on
+       //1) vÃƒÂµtan maha aktiivse menÃƒÂ¼ÃƒÂ¼lingi kui on
        document.querySelector('.active-menu').className = document.querySelector('.active-menu').className.replace('active-menu', '');
 
        //2) lisan uuele juurde
@@ -318,7 +315,7 @@
 
      }
 
-   }; // MOOSIPURGI LÃ•PP
+   }; // MOOSIPURGI LÃƒâ€¢PP
 
    var Jar = function(new_id, new_title, new_link){
 	 this.id = new_id;
@@ -330,11 +327,11 @@
    Jar.prototype = {
      createHtmlElement: function(){
 
-       // vÃµttes title ja link ->
+       // vÃƒÂµttes title ja link ->
        /*
        li
         span.letter
-          M <- title esimene tÃ¤ht
+          M <- title esimene tÃƒÂ¤ht
         span.content
           title | link
        */
@@ -391,7 +388,7 @@
 		return uuid;
 	}
 
-   // kui leht laetud kÃ¤ivitan Moosipurgi rakenduse
+   // kui leht laetud kÃƒÂ¤ivitan Moosipurgi rakenduse
    window.onload = function(){
      var app = new Muusikapurk();
    };
